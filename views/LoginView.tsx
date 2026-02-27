@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import { isAdminInCollection } from '../services/adminService';
 
 interface LoginViewProps {
   onLogin: () => void;
@@ -12,11 +13,14 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setResetMessage('');
     setLoading(true);
 
     try {
@@ -29,11 +33,40 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         return;
       }
 
+      const existsInAdmins = await isAdminInCollection(credential.user.uid, credential.user.email || email);
+      if (!existsInAdmins) {
+        await auth.signOut();
+        setError('Access denied. Admin profile not found in admins collection.');
+        return;
+      }
+
       onLogin();
     } catch {
       setError('Invalid credentials or permission denied.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    setError('');
+    setResetMessage('');
+
+    const normalizedEmail = String(email || '').trim();
+    if (!normalizedEmail) {
+      setError('Please enter your admin email first, then click Forgot password.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, normalizedEmail);
+      setResetMessage('Password reset email sent. Please check your inbox.');
+    } catch {
+      setError('Unable to send reset email. Check the address and try again.');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -70,7 +103,9 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300" htmlFor="password">Password</label>
-                <a className="text-xs font-semibold text-primary hover:underline" href="#">Forgot password?</a>
+                <a className="text-xs font-semibold text-primary hover:underline" href="#" onClick={handleForgotPassword}>
+                  {resetLoading ? 'Sending...' : 'Forgot password?'}
+                </a>
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors">
@@ -109,6 +144,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             {error && (
               <div className="text-sm text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
                 {error}
+              </div>
+            )}
+
+            {resetMessage && (
+              <div className="text-sm text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                {resetMessage}
               </div>
             )}
 

@@ -8,6 +8,7 @@ import UserManagementView from './views/UserManagementView';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import { auth } from './services/firebase';
+import { isAdminInCollection } from './services/adminService';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -29,8 +30,9 @@ const App: React.FC = () => {
       try {
         const tokenResult = await user.getIdTokenResult(true);
         const hasAdminClaim = tokenResult.claims.admin === true;
+        const existsInAdmins = await isAdminInCollection(user.uid, user.email || '');
 
-        if (!hasAdminClaim) {
+        if (!hasAdminClaim || !existsInAdmins) {
           await auth.signOut();
           setAdminUser(null);
           setIsAuthenticated(false);

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { AdminUser, SubscriptionStatus } from '../types';
-import { banUser, deleteUserDoc, fetchUsers, unbanUser } from '../services/adminService';
+import { banUser, deleteUserDoc, subscribeUsers, unbanUser } from '../services/adminService';
 
 const UserManagementView: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -10,22 +10,22 @@ const UserManagementView: React.FC = () => {
   const [error, setError] = useState('');
   const [actionUserId, setActionUserId] = useState('');
 
-  const loadUsers = async () => {
+  useEffect(() => {
     setLoading(true);
     setError('');
 
-    try {
-      const rows = await fetchUsers();
-      setUsers(rows);
-    } catch {
-      setError('Failed to load users. Check Firebase rules and admin claim.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const unsubscribe = subscribeUsers(
+      (rows) => {
+        setUsers(rows);
+        setLoading(false);
+      },
+      () => {
+        setError('Failed to load users. Check Firebase rules and admin claim.');
+        setLoading(false);
+      }
+    );
 
-  useEffect(() => {
-    loadUsers();
+    return () => unsubscribe();
   }, []);
 
   const filteredUsers = useMemo(
@@ -59,7 +59,6 @@ const UserManagementView: React.FC = () => {
       } else {
         await banUser(user.id);
       }
-      await loadUsers();
     } catch {
       setError('Failed to update user status.');
     } finally {
@@ -74,7 +73,6 @@ const UserManagementView: React.FC = () => {
 
       try {
         await deleteUserDoc(user.id);
-        await loadUsers();
       } catch {
         setError('Delete failed. Firestore rules may block this action.');
       } finally {
@@ -199,13 +197,15 @@ const UserManagementView: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">User Info</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subscription Status</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Payment</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Balance</th>
+                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Current Virtual Number</th>
                 <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {!loading && filteredUsers.length === 0 && (
                 <tr>
-                  <td className="px-6 py-8 text-center text-slate-400" colSpan={4}>
+                  <td className="px-6 py-8 text-center text-slate-400" colSpan={6}>
                     No users found.
                   </td>
                 </tr>
@@ -213,7 +213,7 @@ const UserManagementView: React.FC = () => {
 
               {loading && (
                 <tr>
-                  <td className="px-6 py-8 text-center text-slate-400" colSpan={4}>
+                  <td className="px-6 py-8 text-center text-slate-400" colSpan={6}>
                     Loading users...
                   </td>
                 </tr>
@@ -250,6 +250,12 @@ const UserManagementView: React.FC = () => {
                     }`}>
                       {user.paymentStatus === 'active' ? 'Active' : 'Inactive'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">
+                    {user.balance}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-300 font-mono">
+                    {user.currentNumber || '-'}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-3">

@@ -17,11 +17,22 @@ export interface AdminUser {
   rawStatus: string;
   avatar?: string;
   balance: number;
+  currentNumber: string;
   packageId: string;
   paymentStatus: 'active' | 'inactive';
   subscriptionExpiryTime: string | null;
   createdAt: string | null;
   lastLogin: string | null;
+}
+
+export interface AdminTransaction {
+  id: string;
+  userId: string;
+  userEmail: string;
+  amountSpent: string;
+  tokensAdded: number;
+  date: string;
+  source: 'purchaseHistory' | 'token_transactions';
 }
 
 export interface SecurityLog {
